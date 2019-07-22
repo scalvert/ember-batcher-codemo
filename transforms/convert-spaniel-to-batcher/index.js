@@ -23,7 +23,7 @@ module.exports = function transformer(file, api) {
 
   let importNames = [];
 
-  function replaceImport(importDeclaration) {
+  function addImport(importDeclaration, replace = true) {
     importNames = importNames
       .sort(function(a, b) {
         let localA = a.local.name.toUpperCase();
@@ -32,9 +32,33 @@ module.exports = function transformer(file, api) {
       })
       .reverse();
 
-    importDeclaration.replaceWith(
+    importDeclaration[replace ? 'replaceWith' : 'insertBefore'](
       j.importDeclaration(importNames, j.literal('ember-batcher'))
     );
+  }
+
+  function updateImports(importDeclaration) {
+    let spanielImport = importDeclaration.get(0).node;
+    let specifiers = spanielImport.specifiers;
+    let shouldUpdate = specifiers.some(
+      node => !namedImports.includes(node.local.name)
+    );
+
+    if (shouldUpdate) {
+      let i = specifiers.length;
+
+      while (i--) {
+        let sp = specifiers[i];
+
+        if (namedImports.includes(sp.local.name)) {
+          specifiers.splice(i, 1);
+        }
+      }
+
+      addImport(importDeclaration, false);
+    } else {
+      addImport(importDeclaration);
+    }
   }
 
   function findImportPath(names, path) {
@@ -83,7 +107,7 @@ module.exports = function transformer(file, api) {
       }
 
       if (importNames.length > 0) {
-        replaceImport(spanielImports);
+        updateImports(spanielImports);
       }
     }
   }
